@@ -45,7 +45,16 @@ func SumSlice(elements []int) int {
 	}
 	return result
 }
-
+func Part2(nums []int) int {
+	increases := 0
+	for i, num := range nums[3:] {
+		fmt.Printf("%d: %d, %d\n", i, num, nums[i])
+		if num > nums[i] {
+			increases++
+		}
+	}
+	return increases
+}
 func main() {
 	inputs := ReadToLines(os.Stdin)
 	intInputs := StringsToInts(inputs)
@@ -72,4 +81,6 @@ func main() {
 	}
 
 	fmt.Printf("Part 2: %d\n", part2)
+
+	fmt.Printf("Part 2: %d\n", Part2(intInputs))
 }

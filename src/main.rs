@@ -10,6 +10,7 @@ use std::io::{BufReader};
 use std::fs::File;
 
 mod day1;
+mod day2;
 
 fn main() {
 	let matches = App::new("Advent of Code")
@@ -55,6 +56,7 @@ fn main() {
 	let day = matches.value_of("day").unwrap().parse::<u32>().unwrap();
 	match day {
 		1 => day1::solve(input),
+		2 => day2::solve(input),
 		_ => println!("Oops! Day {} isn't implemented yet!", day)
 	}
 }
