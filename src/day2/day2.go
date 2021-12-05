@@ -60,6 +60,7 @@ func Part2(lines []string) {
 
 	fmt.Printf("Part 2: %d\n", hPos*depth)
 }
+
 func main() {
 	lines := ReadToLines(os.Stdin)
 
