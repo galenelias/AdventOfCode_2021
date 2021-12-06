@@ -9,36 +9,18 @@ struct Point {
 fn sub_solve(point_pairs: &Vec<Vec<Point>>, part2: bool) {
 	let mut grid: HashMap<(i64, i64), usize> = HashMap::new();
 
-	for points in point_pairs {
-		if points[0].x == points[1].x { // vertical line
-			let x = points[0].x;
-			let lower = std::cmp::min(points[0].y, points[1].y);
-			let upper = std::cmp::max(points[0].y, points[1].y);
-			for y in lower..=upper {
-				(*grid.entry((x, y)).or_default()) += 1;
-			}
-		} else if points[0].y == points[1].y { // horizontal line
-			let y = points[0].y;
-			let lower = std::cmp::min(points[0].x, points[1].x);
-			let upper = std::cmp::max(points[0].x, points[1].x);
-			for x in lower..=upper {
-				(*grid.entry((x, y)).or_default()) += 1;
-			}
-		} else if part2 {
-			let dx = (points[1].x - points[0].x) / (points[1].x - points[0].x).abs();
-			let dy = (points[1].y - points[0].y) / (points[1].y - points[0].y).abs();
+	// If we're on part 1, filter down to only horizontal or vertical lines
+	for points in point_pairs.iter().filter(|points| part2 || points[0].x == points[1].x || points[0].y == points[1].y) {
+		let dx = (points[1].x - points[0].x).signum();
+		let dy = (points[1].y - points[0].y).signum();
 
-			let mut x = points[0].x;
-			let mut y = points[0].y;
+		let mut x = points[0].x;
+		let mut y = points[0].y;
 
-			loop {
-				(*grid.entry((x, y)).or_default()) += 1;
-				if x == points[1].x {
-					break;
-				}
-				x += dx;
-				y += dy;
-			}
+		while (x, y) != (points[1].x + dx, points[1].y + dy) {
+			(*grid.entry((x, y)).or_default()) += 1;
+			x += dx;
+			y += dy;
 		}
 	}
 
