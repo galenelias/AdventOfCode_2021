@@ -57,5 +57,5 @@ pub fn solve(inputs: Vec<String>) {
 	}
 
     println!("Part 1: {}", low_points.iter().map(|&(r, c)| grid[r][c] + 1).sum::<u32>());
-    println!("Part 2: {}", basin_sizes.iter().sorted().rev().take(3).product());
+    println!("Part 2: {}", basin_sizes.iter().sorted().rev().take(3).product::<usize>());
 }
