@@ -1,39 +1,20 @@
 use itertools::Itertools;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet};
 
-#[derive(Debug)]
-struct Node {
-	is_big: bool,
-	connections: Vec<String>,
+fn is_small(node_name: &str) -> bool {
+	node_name.chars().all(|ch| ch.is_lowercase())
 }
 
-impl Node {
-	pub fn new(node_name: &str) -> Self {
-		Node {
-			is_big: node_name.chars().all(|ch| ch.is_uppercase()),
-			connections: Vec::new(),
-		}
-	}
-}
-
-fn sub_solve(nodes: &HashMap<String, Node>, allow_double_dip: bool) -> usize {
+fn sub_solve<'a>(node_connections: &HashMap<&'a str, Vec<&'a str>>, allow_double_dip: bool) -> usize {
 	let mut path_count = 0;
 
-	let mut q: VecDeque<(Vec<String>, bool)> = VecDeque::new();
-	q.push_back((vec![String::from("start")], false));
+	let mut q: Vec<(&str, HashSet<&str>, bool)> = Vec::new();
+	q.push(("start", HashSet::new(), false));
 
 	while !q.is_empty() {
-		let (path, mut did_double_dip) = q.pop_front().unwrap();
-		let node_str = path.last().unwrap();
+		let (node_str, mut visited, mut did_double_dip) = q.pop().unwrap();
 
-		if node_str == "end" {
-			path_count += 1;
-			continue;
-		}
-
-		let node = nodes.get(node_str).unwrap();
-
-		if !node.is_big && path.iter().filter(|&e| e == node_str).count() > 1 {
+		if is_small(node_str) && visited.contains(node_str) {
 			if !allow_double_dip || did_double_dip || node_str == "start" {
 				continue;
 			} else {
@@ -41,10 +22,13 @@ fn sub_solve(nodes: &HashMap<String, Node>, allow_double_dip: bool) -> usize {
 			}
 		}
 
-		for connection in &node.connections {
-			let mut new_path = path.clone();
-			new_path.push(connection.clone());
-			q.push_back((new_path, did_double_dip));
+		visited.insert(node_str);
+		for connection in node_connections.get(node_str).unwrap() {
+			if *connection == "end" {
+				path_count += 1;
+			} else {
+				q.push((connection, visited.clone(), did_double_dip));
+			}
 		}
 	}
 
@@ -52,20 +36,16 @@ fn sub_solve(nodes: &HashMap<String, Node>, allow_double_dip: bool) -> usize {
 }
 
 pub fn solve(inputs: Vec<String>) {
-	let mut nodes: HashMap<String, Node> = HashMap::new();
+	let mut nodes: HashMap<&str, Vec<&str>> = HashMap::new();
 
-	for input in inputs {
+	for input in &inputs {
 		let parts = input.split('-').collect_vec();
 
-		{
-			let p1 = nodes.entry(parts[0].to_owned()).or_insert(Node::new(parts[0]));
-			(*p1).connections.push(parts[1].to_owned());
-		}
+		let p1 = nodes.entry(parts[0]).or_insert(Vec::new());
+		(*p1).push(parts[1]);
 
-		{
-			let p2 = nodes.entry(parts[1].to_owned()).or_insert(Node::new(parts[1]));
-			(*p2).connections.push(parts[0].to_owned());
-		}
+		let p2 = nodes.entry(parts[1]).or_insert(Vec::new());
+		(*p2).push(parts[0]);
 	}
 
 	println!("Part 1: {}", sub_solve(&nodes, false /*allow_double_dip*/));
