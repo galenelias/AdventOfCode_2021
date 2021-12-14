@@ -1,53 +1,52 @@
 use itertools::Itertools;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 fn is_small(node_name: &str) -> bool {
-	node_name.chars().all(|ch| ch.is_lowercase())
+    node_name.chars().all(|ch| ch.is_lowercase())
 }
 
-fn sub_solve<'a>(node_connections: &HashMap<&'a str, Vec<&'a str>>, allow_double_dip: bool) -> usize {
-	let mut path_count = 0;
+fn sub_solve<'a>(
+    node_connections: &HashMap<&'a str, Vec<&'a str>>,
+    node_str: &'a str,
+    visited: &mut Vec<&'a str>,
+    mut allow_double_dip: bool,
+) -> usize {
+    if node_str == "end" {
+        return 1;
+    }
 
-	let mut q: Vec<(&str, HashSet<&str>, bool)> = Vec::new();
-	q.push(("start", HashSet::new(), false));
+    if is_small(node_str) && visited.contains(&node_str) {
+        if !allow_double_dip || node_str == "start" {
+            return 0;
+        } else {
+            allow_double_dip = false;
+        }
+    }
 
-	while !q.is_empty() {
-		let (node_str, mut visited, mut did_double_dip) = q.pop().unwrap();
+    visited.push(node_str);
+    let sub_sum = node_connections
+        .get(node_str).unwrap()
+        .iter()
+        .map(|connection| sub_solve(node_connections, connection, visited, allow_double_dip))
+        .sum::<usize>();
+    visited.pop();
 
-		if is_small(node_str) && visited.contains(node_str) {
-			if !allow_double_dip || did_double_dip || node_str == "start" {
-				continue;
-			} else {
-				did_double_dip = true;
-			}
-		}
-
-		visited.insert(node_str);
-		for connection in node_connections.get(node_str).unwrap() {
-			if *connection == "end" {
-				path_count += 1;
-			} else {
-				q.push((connection, visited.clone(), did_double_dip));
-			}
-		}
-	}
-
-	return path_count;
+    return sub_sum;
 }
 
 pub fn solve(inputs: Vec<String>) {
-	let mut nodes: HashMap<&str, Vec<&str>> = HashMap::new();
+    let mut nodes: HashMap<&str, Vec<&str>> = HashMap::new();
 
-	for input in &inputs {
-		let parts = input.split('-').collect_vec();
+    for input in &inputs {
+        let parts = input.split('-').collect_vec();
 
-		let p1 = nodes.entry(parts[0]).or_insert(Vec::new());
-		(*p1).push(parts[1]);
+        let p1 = nodes.entry(parts[0]).or_insert(Vec::new());
+        (*p1).push(parts[1]);
 
-		let p2 = nodes.entry(parts[1]).or_insert(Vec::new());
-		(*p2).push(parts[0]);
-	}
+        let p2 = nodes.entry(parts[1]).or_insert(Vec::new());
+        (*p2).push(parts[0]);
+    }
 
-	println!("Part 1: {}", sub_solve(&nodes, false /*allow_double_dip*/));
-	println!("Part 2: {}", sub_solve(&nodes, true /*allow_double_dip*/));
+    println!( "Part 1: {}", sub_solve( &nodes, "start", &mut Vec::new(), false /*allow_double_dip*/));
+    println!( "Part 2: {}", sub_solve( &nodes, "start", &mut Vec::new(), true /*allow_double_dip*/));
 }
