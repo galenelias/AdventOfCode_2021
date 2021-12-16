@@ -1,52 +1,35 @@
 use itertools::Itertools;
 
-fn read_bits_opt<'a>(bits: &mut impl Iterator<Item = &'a char>, mut n: usize) -> Option<u64> {
-	let chunk = bits.take(n).collect_vec();
-
-	if chunk.len() == 0 {
-		return None
-	}
-
-	let mut result: u64 = 0;
-	for ch in &chunk {
-		if *ch == &'1' {
-			result += 1 << (n -1 );
-		}
-		n -= 1;
-	}
-
-	return Some(result);
+fn to_number(bits: &[u8]) -> u64 {
+	bits.iter().fold(0, |a, b| a << 1 | (*b as u64))
 }
 
-fn read_bits<'a>(bits: &mut impl Iterator<Item = &'a char>, mut n: usize) -> u64 {
-	let chunk = bits.take(n);
-	let mut result: u64 = 0;
-	for ch in chunk {
-		if ch == &'1' {
-			result += 1 << (n -1 );
-		}
-		n -= 1;
-	}
-
-	return result;
+struct BitReader<'a> {
+	bits: &'a Vec<u8>,
+	pos: usize,
 }
 
-fn read_literal<'a>(mut bits: &mut impl Iterator<Item = &'a char>) -> u64 {
-	let mut result: u64 = 0;
-
-	loop {
-		result <<= 4;
-		let prefix = bits.next().unwrap();
-		let num = read_bits(&mut bits, 4);
-
-		result += num;
-
-		if prefix == &'0' {
-			break;
-		}
+impl<'a> BitReader<'a> {
+	fn read_bits(&mut self, n: usize) -> &'a [u8] {
+		self.pos += n;
+		&self.bits[self.pos - n..self.pos]
 	}
 
-	return result;
+	fn read_number(&mut self, n: usize) -> u64 {
+		to_number(self.read_bits(n))
+	}
+
+	fn read_literal(&mut self) -> u64 {
+		let mut result = 0;
+		loop {
+			let chunk = self.read_bits(5);
+			result = result << 4 | to_number(&chunk[1..]);
+			if chunk[0] == 0 {
+				break;
+			}
+		}
+		return result;	
+	}
 }
 
 #[derive(Debug)]
@@ -57,66 +40,44 @@ enum Payload {
 
 #[derive(Debug)]
 struct Packet {
-	version: u8,
-	ptype: u8,
+	version: u64,
+	ptype: u64,
 	payload: Payload,
 }
 
-fn read_packet<'a>(mut bits: &mut impl Iterator<Item = &'a char>) -> Option<Packet> {
-	let version = read_bits_opt(&mut bits, 3);
-	if version.is_none() {
-		return None;
-	}
-
-	let version = version.unwrap() as u8;
-	let ptype = read_bits(&mut bits, 3) as u8;
+fn read_packet(bits: &mut BitReader) -> Packet {
+	let version = bits.read_number(3);
+	let ptype = bits.read_number(3);
 
 	if ptype == 4 {
-		let literal = read_literal(&mut bits);
-		return Some(Packet{ version, ptype, payload: Payload::Literal(literal)});
+		let literal = bits.read_literal();
+		return Packet{ version, ptype, payload: Payload::Literal(literal)};
 	} else {
 		// Operator
-		let length_type = bits.next().unwrap();
-		let packets = if length_type == &'0' {
-			let length_in_bits = read_bits(&mut bits, 15);
-			let sub_bits = bits.take(length_in_bits as usize).cloned().collect_vec();
-			read_packets(&mut sub_bits.iter())
+		let length_type = bits.read_bits(1);
+		let mut packets = Vec::new();
+		if length_type[0] == 0 {
+			let length_in_bits = bits.read_number(15);
+			let buffer_end_pos = bits.pos + length_in_bits as usize;
+			while bits.pos < buffer_end_pos {
+				packets.push(read_packet(bits));
+			}
 		} else {
-			let num_sub_packets = read_bits(&mut bits, 11);
-			read_packets_n(bits, num_sub_packets as usize)
+			let num_sub_packets = bits.read_number(11);
+			for _ in 0..num_sub_packets {
+				packets.push(read_packet(bits));
+			}
 		};
-		return Some(Packet{version, ptype, payload: Payload::Operator(packets)});
+		return Packet{version, ptype, payload: Payload::Operator(packets)};
 	}
-}
-
-fn read_packets<'a>(bits: &mut impl Iterator<Item = &'a char>) -> Vec<Packet> {
-	let mut result = Vec::new();
-	loop {
-		if let Some(packet) = read_packet(bits) {
-			result.push(packet);
-		} else {
-			break;
-		}
-	}
-
-	return result;
-}
-
-fn read_packets_n<'a>(bits: &mut impl Iterator<Item = &'a char>, num: usize) -> Vec<Packet> {
-	let mut result = Vec::new();
-	for _ in 0..num {
-		result.push(read_packet(bits).unwrap());
-	}
-
-	return result;
 }
 
 fn sum_versions(packet: &Packet) -> usize {
 	return (packet.version as usize) +
-	match &packet.payload {
-		Payload::Operator(sub_packets) => sub_packets.iter().map(|p| sum_versions(p)).sum::<usize>(),
-		Payload::Literal(_) => 0,
-	}
+		match &packet.payload {
+			Payload::Operator(sub_packets) => sub_packets.iter().map(|p| sum_versions(p)).sum::<usize>(),
+			Payload::Literal(_) => 0,
+		}
 }
 
 fn packet_value(packet: &Packet) -> u64 {
@@ -148,21 +109,15 @@ fn packet_value(packet: &Packet) -> u64 {
 }
 
 pub fn solve(inputs: Vec<String>) {
-	let mut bits: Vec<char> = Vec::new();
+	let bits = inputs[0].chars()
+		.flat_map(|c| {
+			let n = c.to_digit(16).unwrap() as u8;
+			[n >> 3 & 1, n >> 2 & 1, n >> 1 & 1, n & 1]
+		}).collect_vec();
 
-	for ch in inputs[0].chars() {
-		let digit = match ch {
-			'0'..='9' => format!("{:04b}", ch as u8 - '0' as u8),
-			'A'..='F' => format!("{:04b}", ch as u8 - 'A' as u8 + 10),
-			_ => unreachable!(),
-		}.chars().collect_vec();
+	let mut reader = BitReader{ bits: &bits, pos: 0 };
 
-		bits.extend(digit);
-	}
-
-	let mut iter = bits.iter();
-	let packet = read_packet(&mut iter).unwrap();
-
+	let packet = read_packet(&mut reader);
 	println!("Part 1: {}", sum_versions(&packet));
 	println!("Part 2: {}", packet_value(&packet));
 }
